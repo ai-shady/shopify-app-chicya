@@ -1,0 +1,15 @@
+query CartDeliveryOptionsTransformRunInput {
+  cart {
+    deliveryGroups {
+      deliveryOptions {
+        handle
+        title
+      }
+    }
+  }
+  deliveryCustomization {
+    metafield(namespace: "$app:chicya-delivery", key: "function-configuration") {
+      jsonValue
+    }
+  }
+}

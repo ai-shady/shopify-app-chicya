@@ -1,0 +1,13 @@
+name = "chicya-web-pixel"
+type = "web_pixel_extension"
+uid = "a9e7c96e-39dd-a758-7369-4f5c6010b3efb32c97e0"
+
+runtime_context = "strict"
+
+[settings]
+type = "object"
+
+[settings.fields.accountID]
+name = "Account ID"
+description = "Optional account ID attached to every pixel event"
+type = "single_line_text_field"

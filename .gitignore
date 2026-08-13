@@ -1,0 +1,8 @@
+node_modules/
+.shopify/
+target/
+dist/
+.vercel/
+.DS_Store
+.env
+.env.local

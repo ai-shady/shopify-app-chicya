@@ -1,0 +1,23 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "t:name"
+handle = "chicya-discount"
+type = "function"
+uid = "b2357099-098c-3415-13d1-bba8056f59b629e7dd17"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart_lines_discounts_generate_run"
+
+  [[extensions.targeting]]
+  target = "cart.delivery-options.discounts.generate.run"
+  input_query = "src/cart_delivery_options_discounts_generate_run.graphql"
+  export = "cart_delivery_options_discounts_generate_run"
+
+  [extensions.build]
+  command = "cargo build --target=wasm32-unknown-unknown --release"
+  path = "target/wasm32-unknown-unknown/release/chicya-discount.wasm"
+  watch = [ "src/**/*.rs" ]

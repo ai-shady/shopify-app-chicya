@@ -1,0 +1,29 @@
+<div class="chicya-vibe" style="background:{{ block.settings.background }};color:{{ block.settings.foreground }};border:3px solid #121212;border-radius:24px;padding:24px;display:flex;align-items:center;gap:16px;box-shadow:8px 8px 0 #121212;flex-wrap:wrap;">
+  <span style="flex:none;background:{{ block.settings.accent }};color:#121212;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:6px 14px;border-radius:100px;font-size:12px;">{{ block.settings.eyebrow }}</span>
+  <div style="min-width:200px;flex:1;">
+    <p style="margin:0;font-weight:700;font-size:18px;line-height:1.25;">{{ block.settings.heading }}</p>
+    {% if block.settings.subheading != blank %}
+      <p style="margin:6px 0 0;opacity:.85;font-size:14px;">{{ block.settings.subheading }}</p>
+    {% endif %}
+    {% if block.settings.show_product and block.settings.product != blank %}
+      <p style="margin:10px 0 0;font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:13px;">★ {{ block.settings.product.title }}</p>
+    {% endif %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "CHICYA Vibe Block",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Eyebrow", "default": "New drop" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Colour is a language. We are fluent." },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Be bold. Be CHICYA." },
+    { "type": "product", "id": "product", "label": "Featured product", "autofill": true },
+    { "type": "checkbox", "id": "show_product", "label": "Show product name", "default": true },
+    { "type": "color", "id": "background", "label": "Background", "default": "#FF3EA5" },
+    { "type": "color", "id": "foreground", "label": "Text", "default": "#121212" },
+    { "type": "color", "id": "accent", "label": "Accent", "default": "#D6F32F" }
+  ]
+}
+{% endschema %}

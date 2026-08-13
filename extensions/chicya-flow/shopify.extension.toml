@@ -1,0 +1,19 @@
+[[extensions]]
+name = "t:name"
+handle = "chicya-flow"
+type = "flow_template"
+uid = "2379290f-c38f-962d-ad1a-a5271259812be1e01ef1"
+description = "t:description"
+
+[extensions.template]
+
+categories = ["orders", "loyalty"]
+
+module = "./template.flow"
+
+# Custom apps must set require_app = true
+require_app = true
+
+discoverable = true
+
+enabled = true

@@ -1,0 +1,21 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "21d39f659c134afb356bd8a74666a6a5"
+name = "chicya-app"
+application_url = "https://app.chicya.com"
+embedded = true
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_app_proxy,write_content,write_online_store_pages,write_pixels,write_products,write_theme_code,write_themes,write_discounts"
+
+[auth]
+redirect_urls = [ "https://app.chicya.com/auth/callback" ]
+
+[app_proxy]
+url = "https://app.chicya.com/proxy/lookbook"
+subpath = "lookbook"
+prefix = "apps"
