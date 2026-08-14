@@ -1,11 +1,23 @@
 query CartTransformRunInput {
   cart {
+    requestedFreeGift: metafield(namespace: "$app", key: "requestedFreeGift") {
+      value
+    }
+    giftVariantId: metafield(namespace: "$app", key: "giftVariantId") {
+      value
+    }
     lines {
       id
       quantity
       cost {
         subtotalAmount {
           amount
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
         }
       }
     }

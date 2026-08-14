@@ -2,5 +2,6 @@
   "title": "CHICYA Colour Clash",
   "slogan": "Be bold. Be CHICYA. Colour is a language — we are fluent.",
   "freeGiftLabel": "Add a surprise CHICYA free gift to my order",
-  "metafieldChangesAreNotSupported": "Cart metafield changes are not supported in this checkout"
+  "metafieldChangesAreNotSupported": "Cart metafield changes are not supported in this checkout",
+  "giftVariantMissing": "Free gift variant is not configured yet."
 }

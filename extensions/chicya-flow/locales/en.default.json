@@ -1,5 +1,5 @@
 {
   "name": "CHICYA Colour Club Tag",
   "description": "Automatically tags new orders so the CHICYA Colour Club lookbook stays in sync.",
-  "preInstallNote": "The workflow tags orders with \"CHICYA-Colour-Club\". Remove the tag step if you do not want order tags changed."
+  "preInstallNote": "The workflow tags orders with \"chicya\". Remove the tag step if you do not want order tags changed."
 }

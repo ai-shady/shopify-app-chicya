@@ -8,9 +8,13 @@ embedded = true
 [webhooks]
 api_version = "2026-07"
 
+  [[webhooks.subscriptions]]
+  topics = [ "products/create", "orders/create" ]
+  uri = "https://app.chicya.com/events/webhook"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_app_proxy,write_content,write_online_store_pages,write_pixels,write_products,write_theme_code,write_themes,write_discounts"
+scopes = "write_app_proxy,write_content,write_online_store_pages,write_pixels,write_products,read_orders,write_theme_code,write_themes,write_discounts"
 
 [auth]
 redirect_urls = [ "https://app.chicya.com/auth/callback" ]

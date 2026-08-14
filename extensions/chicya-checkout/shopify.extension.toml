@@ -37,6 +37,10 @@ api_access = true
 namespace = "$app"
 key = "requestedFreeGift"
 
+[[extensions.metafields]]
+namespace = "$app"
+key = "giftVariantId"
+
 # Defines settings that will be collected from merchants installing
 # your extension. Learn more:
 # https://shopify.dev/docs/api/checkout-ui-extensions/latest/configuration#settings-definition

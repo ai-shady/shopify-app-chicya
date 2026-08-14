@@ -1,5 +1,5 @@
 {
   "name": "Étiquette CHICYA Colour Club",
   "description": "Étiquette automatiquement les nouvelles commandes pour garder le lookbook CHICYA Colour Club synchronisé.",
-  "preInstallNote": "Le workflow étiquette les commandes avec \"CHICYA-Colour-Club\". Supprimez l'étape d'étiquetage si vous ne souhaitez pas modifier les étiquettes."
+  "preInstallNote": "Le workflow étiquette les commandes avec \"chicya\". Supprimez l'étape d'étiquetage si vous ne souhaitez pas modifier les étiquettes."
 }

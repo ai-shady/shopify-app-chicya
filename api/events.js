@@ -1,8 +1,10 @@
 import crypto from 'crypto';
+import { redis, redisPipeline, redisAvailable } from './lib/redis.js';
 
 export const config = { api: { bodyParser: false } };
 
 const MAX_EVENTS = 50;
+const EVENTS_KEY = 'chicya:events';
 const events = [];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -23,15 +25,44 @@ function verifyWebhook(rawBody, hmacHeader, secret) {
   }
 }
 
-function pushEvent(type, source, payload) {
-  events.unshift({
+function buildEvent(type, source, payload) {
+  return {
     id: crypto.randomUUID(),
     time: new Date().toISOString(),
     type,
     source,
     payload
-  });
+  };
+}
+
+async function pushEvent(type, source, payload) {
+  const event = buildEvent(type, source, payload);
+  events.unshift(event);
   while (events.length > MAX_EVENTS) events.pop();
+
+  if (redisAvailable()) {
+    await redisPipeline([
+      ['LPUSH', EVENTS_KEY, JSON.stringify(event)],
+      ['LTRIM', EVENTS_KEY, 0, MAX_EVENTS - 1]
+    ]);
+  }
+  return event;
+}
+
+async function loadEvents() {
+  if (!redisAvailable()) return events;
+  const raw = await redis('LRANGE', EVENTS_KEY, 0, MAX_EVENTS - 1);
+  if (!Array.isArray(raw)) return events;
+  const parsed = raw
+    .map((item) => {
+      try {
+        return JSON.parse(item);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+  return parsed.length ? parsed : events;
 }
 
 const STYLE = `
@@ -52,8 +83,9 @@ tr:hover td{background:#fff8f0}
 a.btn{display:inline-block;background:var(--fg);color:var(--lime);padding:12px 20px;border-radius:100px;text-decoration:none;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
 `;
 
-function renderPanel(req) {
+function renderPanel(req, events) {
   const host = req.headers.host || 'app.chicya.com';
+  const storage = redisAvailable() ? 'Redis (Upstash)' : '内存 (实例重启即丢失)';
   const rows = events.length
     ? events.map((e) => `
       <tr>
@@ -78,7 +110,7 @@ function renderPanel(req) {
   <span class="badge">live</span>
   <h1>Webhook<br>events</h1>
   <div class="card">
-    <p><span class="status-dot"></span>监听 <code>products/create</code> 与 <code>orders/create</code>。Endpoint: <code>https://${host}/events/webhook</code></p>
+    <p><span class="status-dot"></span>监听 <code>products/create</code> 与 <code>orders/create</code>。Endpoint: <code>https://${host}/events/webhook</code> · 存储: <code>${storage}</code></p>
     <a class="btn" href="/events">立即刷新</a>
   </div>
   <table>
@@ -94,12 +126,13 @@ export default async function handler(req, res) {
   const secret = process.env.SHOPIFY_API_SECRET || '';
 
   if (req.method === 'GET') {
+    const loaded = await loadEvents();
     if (url.searchParams.get('view') === 'json') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      return res.status(200).send(JSON.stringify({ count: events.length, events }));
+      return res.status(200).send(JSON.stringify({ count: loaded.length, events: loaded }));
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(renderPanel(req));
+    return res.status(200).send(renderPanel(req, loaded));
   }
 
   if (req.method === 'POST' && url.pathname.startsWith('/events/webhook')) {
@@ -122,14 +155,14 @@ export default async function handler(req, res) {
       payload = { raw: raw.toString('utf8') };
     }
 
-    pushEvent(topic, req.headers['x-shopify-shop-domain'] || 'shopify', {
+    await pushEvent(topic, req.headers['x-shopify-shop-domain'] || 'shopify', {
       id: payload.id,
       title: payload.title,
       handle: payload.handle,
       name: payload.name
     });
 
-    return res.status(200).json({ received: true, topic, events_count: events.length });
+    return res.status(200).json({ received: true, topic });
   }
 
   if (req.method === 'POST' && url.pathname.startsWith('/events/pixel')) {
@@ -140,7 +173,7 @@ export default async function handler(req, res) {
     } catch {
       payload = { raw: raw.toString('utf8') };
     }
-    pushEvent(payload.eventName || 'pixel_event', 'pixel', payload);
+    await pushEvent(payload.eventName || 'pixel_event', 'pixel', payload);
     return res.status(200).json({ received: true });
   }
 

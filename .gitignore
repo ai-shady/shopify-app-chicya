@@ -6,3 +6,5 @@ dist/
 .DS_Store
 .env
 .env.local
+extensions/*/manifest.json
+.env*

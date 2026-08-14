@@ -1,8 +1,24 @@
 import crypto from 'crypto';
 import https from 'https';
+import { redis, redisAvailable } from './lib/redis.js';
+import { ensureGiftVariant } from './lib/gift.js';
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY || '';
 const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET || '';
+
+function tokenKey(shop) {
+  return `shopify:token:${shop}`;
+}
+
+async function storeToken(shop, tokenPayload) {
+  if (!redisAvailable()) return { stored: false, reason: 'redis not configured' };
+  const result = await redis(
+    'SET',
+    tokenKey(shop),
+    JSON.stringify({ ...tokenPayload, stored_at: new Date().toISOString() })
+  );
+  return { stored: result === 'OK', reason: result === 'OK' ? null : 'redis SET failed' };
+}
 
 function verifyHmac(query) {
   if (!query.hmac || !SHOPIFY_API_SECRET) return false;
@@ -111,6 +127,29 @@ export default async function handler(req, res) {
     return res.status(400).send(renderPage('Exchange failed', '换取 access_token 失败：', JSON.stringify(result, null, 2)));
   }
 
+  const storage = await storeToken(query.shop, {
+    access_token: result.access_token,
+    scope: result.scope
+  });
+
+  const storageNote = storage.stored
+    ? 'access_token 已安全存储，Lookbook 现在会拉取真实商品数据。'
+    : `access_token 未能持久化（${storage.reason}）。Lookbook 将使用静态演示数据。`;
+
+  let giftNote = '';
+  if (storage.stored) {
+    try {
+      const gift = await ensureGiftVariant(query.shop, result.access_token);
+      if (gift.ok) {
+        giftNote = `赠品商品已自动创建并写入 Shop metafield <code>$app.giftVariantId</code>，Checkout 免费赠品闭环已就绪（variant: ${gift.variantId}）。`;
+      } else {
+        giftNote = `赠品商品自动创建失败（${gift.error}），可稍后在商店后台手动创建 $0 商品后重装 App 修复。`;
+      }
+    } catch (err) {
+      giftNote = `赠品商品自动创建异常：${err.message}`;
+    }
+  }
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  return res.status(200).send(renderPage('Installed', `chicya-app 已在 <strong>${query.shop}</strong> 重新安装。App proxy 配置已生效，请等待 1-2 分钟后访问 /apps/lookbook。`));
+  return res.status(200).send(renderPage('Installed', `chicya-app 已在 <strong>${query.shop}</strong> 重新安装。${storageNote} ${giftNote} App proxy 配置已生效，请等待 1-2 分钟后访问 /apps/lookbook。`));
 }
