@@ -8,3 +8,4 @@ dist/
 .env.local
 extensions/*/manifest.json
 .env*
+public/

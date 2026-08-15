@@ -20,6 +20,7 @@ An apparel brand voice ("CHICYA") applied across the store:
 | Admin | `chicya-admin` | Branding block on the product details page |
 | Cart | `chicya-cart-transform` | Renames the highest-priced line to a "CHICYA Vibe Pick", and **auto-adds a $0 free gift** (via `lineExpand`) when the customer requests one at checkout |
 | Checkout | `chicya-checkout` | "Add my free gift" checkbox that writes cart metafields (`$app/requestedFreeGift`, `$app/giftVariantId`) |
+| Checkout validation | `chicya-checkout-validation` | Blocking validation (function) that errors at checkout if the requested free gift is not in the cart |
 | Customer account | `chicya-customer-account` | Loyalty banner on the order status page |
 | Delivery | `chicya-delivery` | Prefixes delivery option titles with "CHICYA ·" |
 | Discounts | `chicya-discount` | 10% order discount, 20% product discount, 100% shipping discount |
@@ -28,7 +29,7 @@ An apparel brand voice ("CHICYA") applied across the store:
 | Theme | `chicya-theme-extension` | "CHICYA Vibe Block" with configurable settings |
 | Web pixel | `chicya-web-pixel` | Sends 8 event types to the app backend |
 
-All ten extension targets are **built from a single codebase** and deployed as one app (`chicya-app`).
+All eleven extension targets are **built from a single codebase** and deployed as one app (`chicya-app`).
 
 ---
 
@@ -48,6 +49,9 @@ Shopify (store)  ── app proxy / webhooks / pixel ──►  Vercel serverles
 - `lib/redis.js` — zero-dependency Upstash REST client (HTTP + pipeline)
 - `lib/gift.js` — auto-creates the $0 "CHICYA Free Gift" product + shop metafield on install
 
+### Embedded console (`web/` — Polaris + App Bridge React, built to `public/`)
+The storefront admin console is a Vite SPA using **Polaris** (`@shopify/polaris`) and **App Bridge v4** (`@shopify/app-bridge-react`), bundled into `public/` and served at `/`. It shows the live webhook event feed with toasts/navigation via App Bridge.
+
 ### Free gift loop (fully self-closing)
 1. On install, backend creates a $0 gift product and writes its variant ID to a shop metafield (`$app/giftVariantId`) + Redis.
 2. The checkout extension reads that shop metafield and, when checked, writes `requestedFreeGift` + `giftVariantId` cart metafields.
@@ -59,7 +63,7 @@ Shopify (store)  ── app proxy / webhooks / pixel ──►  Vercel serverles
 
 - **App**: `@shopify/app` + Shopify CLI; API version `2026-07`
 - **Functions**: Rust (`wasm32-unknown-unknown`), `shopify_function` crate, GraphQL typegen
-- **UI**: Preact + `@shopify/ui-extensions` (2026.7.0)
+- **UI**: Preact + `@shopify/ui-extensions` (2026.7.0); embedded console in React + `@shopify/polaris` (^13) + `@shopify/app-bridge-react` (v4)
 - **Backend**: Vercel serverless, Node ESM, global `fetch`
 - **Persistence**: Upstash Redis (HTTP REST — no SDK dependency)
 - **Pixel**: `@shopify/web-pixels-extension`
@@ -74,9 +78,12 @@ api/                     Vercel serverless backend
   oauth.js               OAuth callback
   events.js              webhook / pixel receiver + console data
   proxy/lookbook.js      App Proxy renderer
+web/                     Embedded admin console (Polaris + App Bridge React, Vite)
+  public/                Build output (gitignored), served at / on Vercel
 extensions/
   chicya-{admin,checkout,customer-account,pos,web-pixel}   JS/TSX UI extensions
   chicya-{cart-transform,delivery,discount}                Rust functions
+  chicya-checkout-validation                               Rust validation function
   chicya-flow            Flow template
   chicya-theme-extension Theme block (Liquid)
 shopify.app.toml         App config (scopes, webhooks, app proxy)
@@ -117,8 +124,8 @@ Requirements: Shopify **Basic** plan (or dev store) + **Vercel Hobby** + free **
 ## Scripts
 
 ```bash
-npm run dev          # vercel dev
-shopify app build    # build all 10 extensions
+npm run dev          # vercel dev (backend) / web: npm run dev (console SPA)
+shopify app build    # build all 11 extensions
 shopify app deploy   # release a version (use --allow-updates non-interactively)
 node verify.mjs      # check Redis state: token / gift variant / events (needs .env.local)
 ```
@@ -130,6 +137,8 @@ node verify.mjs      # check Redis state: token / gift variant / events (needs .
 - Webhook events are capped at the latest 50 (`LTRIM`).
 - Lookbook uses live product data when a token exists; otherwise falls back to static demo data.
 - The `GIFT_VARIANT_ID` constant in `cart-transform` is a fallback; the real value comes from the shop metafield via checkout.
+- The checkout-validation function blocks checkout (error at `$.cart`) if `requestedFreeGift` is set but the gift variant isn't in the cart — closing the loop end-to-end.
+- Rebuild the console SPA before backend deploys: `cd web && npm run build`.
 - Built for demonstration — persistence is intentionally minimal (Upstash Redis) to stay within free tiers.
 
 ---

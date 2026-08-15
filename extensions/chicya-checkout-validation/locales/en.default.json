@@ -1,0 +1,4 @@
+{
+  "name": "CHICYA Checkout Validation",
+  "description": "Guarantees the requested free gift is present in the cart at checkout."
+}

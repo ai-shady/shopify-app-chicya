@@ -1,0 +1,20 @@
+query CheckoutValidationRunInput {
+  cart {
+    requestedFreeGift: metafield(namespace: "$app", key: "requestedFreeGift") {
+      value
+    }
+    giftVariantId: metafield(namespace: "$app", key: "giftVariantId") {
+      value
+    }
+    lines {
+      id
+      quantity
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+        }
+      }
+    }
+  }
+}

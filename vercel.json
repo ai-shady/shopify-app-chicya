@@ -3,8 +3,7 @@
     { "source": "/auth/callback", "destination": "/api/oauth" },
     { "source": "/events/:path*", "destination": "/api/events" },
     { "source": "/proxy/(.*)", "destination": "/api/proxy/lookbook" },
-    { "source": "/proxy", "destination": "/api/proxy/lookbook" },
-    { "source": "/(.*)", "destination": "/api/index" }
+    { "source": "/proxy", "destination": "/api/proxy/lookbook" }
   ],
   "headers": [
     {
