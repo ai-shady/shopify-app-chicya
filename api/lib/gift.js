@@ -2,6 +2,8 @@ import { redis, redisAvailable } from './redis.js';
 
 const ADMIN_API_VERSION = '2026-07';
 const GIFT_HANDLE = 'chicya-free-gift';
+const GIFT_IMAGE_URL =
+  'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800';
 
 function giftKey(shop) {
   return `shopify:gift_variant:${shop}`;
@@ -41,8 +43,8 @@ async function findGiftVariant(shop, token) {
 
 async function createGiftProduct(shop, token) {
   const mutation = `
-    mutation CreateGiftProduct($input: ProductCreateInput!) {
-      productCreate(product: $input) {
+    mutation CreateGiftProduct($input: ProductCreateInput!, $media: [CreateMediaInput!]!) {
+      productCreate(product: $input, media: $media) {
         product {
           id
         }
@@ -56,7 +58,14 @@ async function createGiftProduct(shop, token) {
       handle: GIFT_HANDLE,
       productType: 'gift',
       status: 'ACTIVE'
-    }
+    },
+    media: [
+      {
+        mediaContentType: 'IMAGE',
+        alt: 'CHICYA Free Gift',
+        originalSource: GIFT_IMAGE_URL
+      }
+    ]
   });
   const errors = json?.data?.productCreate?.userErrors || [];
   if (errors.length) return { error: errors[0].message };
@@ -126,6 +135,41 @@ async function getShopId(shop, token) {
   return json?.data?.shop?.id || null;
 }
 
+async function getGiftProductId(shop, token) {
+  const query = `
+    query FindGiftProduct($q: String!) {
+      products(first: 1, query: $q) {
+        nodes { id images(first: 1) { nodes { id } } }
+      }
+    }
+  `;
+  const json = await adminRequest(shop, token, query, { q: `handle:${GIFT_HANDLE}` });
+  return json?.data?.products?.nodes?.[0] || null;
+}
+
+async function attachGiftImage(shop, token, productId) {
+  const mutation = `
+    mutation UpdateProduct($id: ID!, $media: [CreateMediaInput!]!) {
+      productUpdate(product: { id: $id }, media: $media) {
+        product { id }
+        userErrors { field message }
+      }
+    }
+  `;
+  const json = await adminRequest(shop, token, mutation, {
+    id: productId,
+    media: [
+      {
+        mediaContentType: 'IMAGE',
+        alt: 'CHICYA Free Gift',
+        originalSource: GIFT_IMAGE_URL
+      }
+    ]
+  });
+  const errors = json?.data?.productUpdate?.userErrors || [];
+  return { ok: errors.length === 0, error: errors[0]?.message || null };
+}
+
 export async function ensureGiftVariant(shop, token) {
   if (!shop || !token) return { ok: false, error: 'missing shop or token' };
 
@@ -137,6 +181,14 @@ export async function ensureGiftVariant(shop, token) {
   }
   if (!variantId) return { ok: false, error: 'no gift variant found or created' };
 
+  const giftProduct = await getGiftProductId(shop, token);
+  let image = { ok: false, error: null };
+  if (giftProduct && (!giftProduct.images?.nodes?.length)) {
+    image = await attachGiftImage(shop, token, giftProduct.id);
+  } else if (giftProduct) {
+    image = { ok: true, error: null };
+  }
+
   if (redisAvailable()) {
     await redis('SET', giftKey(shop), variantId);
   }
@@ -145,5 +197,5 @@ export async function ensureGiftVariant(shop, token) {
   let metafield = { ok: false, error: 'no shop id' };
   if (shopId) metafield = await setShopMetafield(shop, token, shopId, variantId);
 
-  return { ok: true, variantId, metafield };
+  return { ok: true, variantId, image, metafield };
 }
