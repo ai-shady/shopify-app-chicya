@@ -1,0 +1,121 @@
+.landing {
+  min-height: 100vh;
+  background: #fff;
+}
+
+.landing-hero {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(214, 243, 47, 0.35), transparent 60%),
+    radial-gradient(900px 420px at 10% -10%, rgba(47, 75, 255, 0.28), transparent 55%),
+    linear-gradient(135deg, #0f0f23 0%, #1b1040 55%, #2b0f3a 100%);
+  color: #fff;
+  padding: 72px 0 64px;
+}
+
+.landing-hero-inner {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.landing-title {
+  font-size: clamp(56px, 9vw, 96px) !important;
+  line-height: 0.95 !important;
+  letter-spacing: 0.02em;
+  margin: 20px 0 16px !important;
+  background: linear-gradient(90deg, #d6f32f 0%, #7ef2d0 40%, #5ea2ff 80%, #ff5ea8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.landing-subtitle {
+  max-width: 620px;
+  margin: 0 auto 28px !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  font-size: 18px !important;
+}
+
+.landing-body {
+  padding: 40px 0 64px;
+}
+
+.landing-stats .Polaris-Card {
+  background: linear-gradient(160deg, #ffffff, #f6f7ff);
+}
+
+.feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #d6f32f, #2f4bff);
+  color: #0f0f23;
+}
+
+.feature-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.ext-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef1ff;
+  color: #2f4bff;
+  flex-shrink: 0;
+}
+
+.ext-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.step-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #0f0f23;
+  color: #d6f32f;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.arch-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 22px;
+  border-radius: 16px;
+  background: #f4f6ff;
+  border: 1px solid #e2e6ff;
+  text-align: center;
+  color: #2f4bff;
+}
+
+.arch-node svg {
+  width: 26px;
+  height: 26px;
+}
+
+.landing-body .Polaris-Page {
+  max-width: 1024px;
+}
+
+.landing-footer {
+  text-align: center;
+  margin-top: 8px;
+}
