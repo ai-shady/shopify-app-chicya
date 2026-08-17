@@ -10,6 +10,7 @@
     "@preact/signals": "^2.11.0",
     "@shopify/ui-extensions": "2026.7.0",
     "@shopify/web-pixels-extension": "^2.18.0",
+    "pg": "^8.13.1",
     "preact": "^10.29.8"
   }
 }

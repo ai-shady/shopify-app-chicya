@@ -1,13 +1,12 @@
 import crypto from 'crypto';
 import { redis, redisPipeline, redisAvailable } from './lib/redis.js';
+import { pgQuery, pgAvailable } from './lib/pg.js';
 
 export const config = { api: { bodyParser: false } };
 
 const MAX_EVENTS = 50;
 const EVENTS_KEY = 'chicya:events';
 const events = [];
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function readRawBody(req) {
   const chunks = [];
@@ -35,11 +34,50 @@ function buildEvent(type, source, payload) {
   };
 }
 
+function normalizePgRow(r) {
+  return {
+    id: r.id,
+    time: r.time instanceof Date ? r.time.toISOString() : r.time,
+    type: r.type,
+    source: r.source,
+    payload: typeof r.payload === 'string' ? JSON.parse(r.payload) : r.payload
+  };
+}
+
+async function pushPgEvent(event) {
+  return pgQuery(
+    'INSERT INTO chicya_events (id, time, type, source, payload) VALUES ($1, $2, $3, $4, $5)',
+    [event.id, event.time, event.type, event.source, JSON.stringify(event.payload)]
+  );
+}
+
+async function loadPgEvents(limit = MAX_EVENTS) {
+  const res = await pgQuery(
+    'SELECT id, time, type, source, payload FROM chicya_events ORDER BY time DESC LIMIT $1',
+    [limit]
+  );
+  if (!res.ok) return { rows: null, reason: res.reason };
+  return { rows: res.rows.map(normalizePgRow), reason: null };
+}
+
+async function loadPgStats() {
+  const total = await pgQuery('SELECT count(*)::int AS n FROM chicya_events');
+  const byType = await pgQuery(
+    'SELECT type, count(*)::int AS n FROM chicya_events GROUP BY type ORDER BY n DESC'
+  );
+  if (!total.ok || !byType.ok) return null;
+  return { total: total.rows[0].n, byType: byType.rows };
+}
+
 async function pushEvent(type, source, payload) {
   const event = buildEvent(type, source, payload);
   events.unshift(event);
   while (events.length > MAX_EVENTS) events.pop();
 
+  if (pgAvailable()) {
+    const res = await pushPgEvent(event);
+    if (res.ok) return event;
+  }
   if (redisAvailable()) {
     await redisPipeline([
       ['LPUSH', EVENTS_KEY, JSON.stringify(event)],
@@ -50,19 +88,43 @@ async function pushEvent(type, source, payload) {
 }
 
 async function loadEvents() {
-  if (!redisAvailable()) return events;
-  const raw = await redis('LRANGE', EVENTS_KEY, 0, MAX_EVENTS - 1);
-  if (!Array.isArray(raw)) return events;
-  const parsed = raw
-    .map((item) => {
-      try {
-        return JSON.parse(item);
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean);
-  return parsed.length ? parsed : events;
+  if (pgAvailable()) {
+    const pg = await loadPgEvents();
+    if (pg.rows) return pg.rows;
+  }
+  if (redisAvailable()) {
+    const raw = await redis('LRANGE', EVENTS_KEY, 0, MAX_EVENTS - 1);
+    if (Array.isArray(raw)) {
+      const parsed = raw
+        .map((item) => {
+          try {
+            return JSON.parse(item);
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      if (parsed.length) return parsed;
+    }
+  }
+  return events;
+}
+
+async function getStats() {
+  if (pgAvailable()) {
+    const s = await loadPgStats();
+    if (s) return s;
+  }
+  const byType = {};
+  const loaded = await loadEvents();
+  for (const e of loaded) byType[e.type] = (byType[e.type] || 0) + 1;
+  return { total: loaded.length, byType: Object.entries(byType).map(([type, n]) => ({ type, n })) };
+}
+
+function storageLabel() {
+  if (pgAvailable()) return 'Postgres (Neon)';
+  if (redisAvailable()) return 'Redis (Upstash)';
+  return '内存 (实例重启即丢失)';
 }
 
 const STYLE = `
@@ -83,9 +145,9 @@ tr:hover td{background:#fff8f0}
 a.btn{display:inline-block;background:var(--fg);color:var(--lime);padding:12px 20px;border-radius:100px;text-decoration:none;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
 `;
 
-function renderPanel(req, events) {
+function renderPanel(req, events, stats) {
   const host = req.headers.host || 'app.chicya.com';
-  const storage = redisAvailable() ? 'Redis (Upstash)' : '内存 (实例重启即丢失)';
+  const storage = storageLabel();
   const rows = events.length
     ? events.map((e) => `
       <tr>
@@ -95,6 +157,10 @@ function renderPanel(req, events) {
         <td><div class="code">${JSON.stringify(e.payload, null, 2).slice(0, 400)}${JSON.stringify(e.payload).length > 400 ? '…' : ''}</div></td>
       </tr>`).join('')
     : `<tr><td colspan="4" class="empty">暂无事件。创建一个商品或订单后刷新此页。</td></tr>`;
+
+  const statChips = stats && stats.byType.length
+    ? stats.byType.map((s) => `<span class="badge" style="margin:2px">${s.type}: ${s.n}</span>`).join('')
+    : '<span>暂无</span>';
 
   return `<!doctype html>
 <html lang="zh-CN">
@@ -111,6 +177,7 @@ function renderPanel(req, events) {
   <h1>Webhook<br>events</h1>
   <div class="card">
     <p><span class="status-dot"></span>监听 <code>products/create</code> 与 <code>orders/create</code>。Endpoint: <code>https://${host}/events/webhook</code> · 存储: <code>${storage}</code></p>
+    <p>累计: <strong>${stats?.total ?? 0}</strong> ${statChips}</p>
     <a class="btn" href="/events">立即刷新</a>
   </div>
   <table>
@@ -128,11 +195,13 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const loaded = await loadEvents();
     if (url.searchParams.get('view') === 'json') {
+      const stats = await getStats();
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      return res.status(200).send(JSON.stringify({ count: loaded.length, events: loaded }));
+      return res.status(200).send(JSON.stringify({ count: loaded.length, events: loaded, stats, storage: storageLabel() }));
     }
+    const stats = await getStats();
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(renderPanel(req, loaded));
+    return res.status(200).send(renderPanel(req, loaded, stats));
   }
 
   if (req.method === 'POST' && url.pathname.startsWith('/events/webhook')) {

@@ -40,6 +40,8 @@ function Console({ shop, host, embedded }) {
   const shopify = useAppBridge();
 
   const [events, setEvents] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [storage, setStorage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const apiKey = __CHICYA_API_KEY__;
@@ -52,6 +54,8 @@ function Console({ shop, host, embedded }) {
         const j = await r.json();
         if (!cancelled) {
           setEvents(j.events || []);
+          setStats(j.stats || null);
+          setStorage(j.storage || '');
           setError('');
         }
       } catch (e) {
@@ -121,7 +125,13 @@ function Console({ shop, host, embedded }) {
       ) : (
         <Banner tone="info" title="Webhook 实时事件">
           Endpoint <code>/events/webhook</code> · 最近 {events.length} 条 ·
-          事件持久化于 Upstash Redis，跨冷启动保留
+          持久化于 {storage || 'Postgres (Neon)'}，跨冷启动保留
+          {stats
+            ? ` · 累计 ${stats.total} 条` +
+              (stats.byType?.length
+                ? `（${stats.byType.map((s) => `${s.type}: ${s.n}`).join(' / ')}）`
+                : '')
+            : ''}
         </Banner>
       )}
 
