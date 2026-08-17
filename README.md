@@ -36,17 +36,17 @@ All eleven extension targets are **built from a single codebase** and deployed a
 ## Architecture
 
 ```
-Shopify (store)  ── app proxy / webhooks / pixel ──►  Vercel serverless API  ──►  Upstash Redis
+Shopify (store)  ── app proxy / webhooks / pixel ──►  Vercel serverless API  ──►  Neon Postgres (+ Upstash Redis)
      │                                                      │
      └── functions (Rust→wasm) + UI extensions ─────────────┘         ▲ persistence
 ```
 
 ### Backend (`api/` — plain JS ESM, Vercel serverless)
-- `index.js` — embedded Admin console (App Bridge) with live webhook event table
 - `oauth.js` — OAuth callback: verifies HMAC, exchanges code for `access_token`, stores it in Redis
-- `events.js` — webhook + pixel receiver with HMAC verification, persists events to Redis (in-memory fallback)
+- `events.js` — webhook + pixel receiver with HMAC verification, persists events to **Neon Postgres** (Redis + in-memory fallback), exposes stats
 - `proxy/lookbook.js` — App Proxy page rendering the store's **real product data** via Admin API (static demo fallback)
 - `lib/redis.js` — zero-dependency Upstash REST client (HTTP + pipeline)
+- `lib/pg.js` — lazy `pg.Pool` client for Neon Postgres
 - `lib/gift.js` — auto-creates the $0 "CHICYA Free Gift" product + shop metafield on install
 
 ### Embedded console (`web/` — Polaris + App Bridge React, built to `public/`)
@@ -65,7 +65,7 @@ The storefront admin console is a Vite SPA using **Polaris** (`@shopify/polaris`
 - **Functions**: Rust (`wasm32-unknown-unknown`), `shopify_function` crate, GraphQL typegen
 - **UI**: Preact + `@shopify/ui-extensions` (2026.7.0); embedded console in React + `@shopify/polaris` (^13) + `@shopify/app-bridge-react` (v4)
 - **Backend**: Vercel serverless, Node ESM, global `fetch`
-- **Persistence**: Upstash Redis (HTTP REST — no SDK dependency)
+- **Persistence**: Neon Postgres (`pg` + `chicya_events` table) for event history; Upstash Redis (HTTP REST — no SDK dependency) for OAuth token + gift variant KV
 - **Pixel**: `@shopify/web-pixels-extension`
 
 ---
@@ -74,12 +74,13 @@ The storefront admin console is a Vite SPA using **Polaris** (`@shopify/polaris`
 
 ```
 api/                     Vercel serverless backend
-  lib/                   redis client + gift provisioning
+  lib/                   redis client + pg client + gift provisioning
   oauth.js               OAuth callback
   events.js              webhook / pixel receiver + console data
   proxy/lookbook.js      App Proxy renderer
+scripts/                 migration / backfill helpers (events → Postgres)
 web/                     Embedded admin console (Polaris + App Bridge React, Vite)
-  public/                Build output (gitignored), served at / on Vercel
+  public/                Build output, served at / on Vercel
 extensions/
   chicya-{admin,checkout,customer-account,pos,web-pixel}   JS/TSX UI extensions
   chicya-{cart-transform,delivery,discount}                Rust functions
@@ -95,12 +96,14 @@ vercel.json              Serverless rewrites + CSP
 
 ## Setup
 
-Requirements: Shopify **Basic** plan (or dev store) + **Vercel Hobby** + free **Upstash Redis**.
+Requirements: Shopify **Basic** plan (or dev store) + **Vercel Hobby** + free **Neon Postgres** + free **Upstash Redis**.
 
 1. **Provision resources**
    ```bash
    vercel integration add upstash/upstash-kv --name upstash-chicya-app
-   vercel env pull .env.local        # KV_REST_API_URL, KV_REST_API_TOKEN, ...
+   vercel integration add neon --name neon-chicya-app
+   vercel env pull .env.local        # KV_REST_API_URL, POSTGRES_URL/DATABASE_URL, ...
+   node scripts/migrate-events.mjs   # create chicya_events table (run once)
    ```
 
 2. **Environment variables** (Vercel project)
@@ -109,13 +112,15 @@ Requirements: Shopify **Basic** plan (or dev store) + **Vercel Hobby** + free **
    | `SHOPIFY_API_KEY` | App client id |
    | `SHOPIFY_API_SECRET` | App secret (used to verify HMAC) |
    | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis access |
+   | `DATABASE_URL` (or `POSTGRES_URL`) | Neon Postgres connection |
 
 3. **Install on a store**
    Visit the OAuth authorize URL (or install from the Shopify App Store / dev dashboard). The callback stores the access token in Redis and auto-creates the gift product.
 
 4. **Deploy**
    ```bash
-   vercel deploy --prod                # backend → app.chicya.com
+   cd web && npm run build            # rebuild SPA into public/
+   cd .. && vercel deploy --prod --force   # backend + SPA → app.chicya.com
    shopify app deploy --allow-updates  # extensions + webhooks
    ```
 
@@ -128,18 +133,20 @@ npm run dev          # vercel dev (backend) / web: npm run dev (console SPA)
 shopify app build    # build all 11 extensions
 shopify app deploy   # release a version (use --allow-updates non-interactively)
 node verify.mjs      # check Redis state: token / gift variant / events (needs .env.local)
+node scripts/migrate-events.mjs   # create chicya_events table (idempotent)
+node scripts/backfill-events.mjs  # copy Redis events into Postgres
 ```
 
 ---
 
 ## Notes & caveats
 
-- Webhook events are capped at the latest 50 (`LTRIM`).
+- Event history lives in **Neon Postgres** (`chicya_events`); the webhook receiver falls back to Redis (`LTRIM` 50) then in-memory if Postgres is unreachable.
 - Lookbook uses live product data when a token exists; otherwise falls back to static demo data.
 - The `GIFT_VARIANT_ID` constant in `cart-transform` is a fallback; the real value comes from the shop metafield via checkout.
 - The checkout-validation function blocks checkout (error at `$.cart`) if `requestedFreeGift` is set but the gift variant isn't in the cart — closing the loop end-to-end.
-- Rebuild the console SPA before backend deploys: `cd web && npm run build`.
-- Built for demonstration — persistence is intentionally minimal (Upstash Redis) to stay within free tiers.
+- Rebuild the console SPA before backend deploys: `cd web && npm run build`, then `vercel deploy --prod --force`.
+- Built for demonstration — persistence is intentionally minimal (Neon Postgres + Upstash Redis) to stay within free tiers.
 
 ---
 
