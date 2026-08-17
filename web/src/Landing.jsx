@@ -247,9 +247,9 @@ function Landing() {
               <Card padding="500">
                 <InlineStack gap="300" wrap blockAlign="center">
                   <Box className="arch-node"><StoreIcon /><Text as="p" variant="bodySm" fontWeight="semibold">Shopify store</Text></Box>
-                  <ArrowRightIcon />
+                  <Box className="arch-arrow"><ArrowRightIcon /></Box>
                   <Box className="arch-node"><CodeIcon /><Text as="p" variant="bodySm" fontWeight="semibold">Vercel serverless</Text></Box>
-                  <ArrowRightIcon />
+                  <Box className="arch-arrow"><ArrowRightIcon /></Box>
                   <Box className="arch-node"><DatabaseIcon /><Text as="p" variant="bodySm" fontWeight="semibold">Neon Postgres</Text></Box>
                   <Box className="arch-node"><RefreshIcon /><Text as="p" variant="bodySm" fontWeight="semibold">Upstash Redis</Text></Box>
                 </InlineStack>

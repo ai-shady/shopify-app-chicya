@@ -111,6 +111,17 @@
   height: 26px;
 }
 
+.arch-arrow {
+  display: flex;
+  align-items: center;
+  color: #2f4bff;
+}
+
+.arch-arrow svg {
+  width: 20px;
+  height: 20px;
+}
+
 .landing-body .Polaris-Page {
   max-width: 1024px;
 }
